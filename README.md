@@ -48,7 +48,7 @@ As of 06/02/2025, there is only one function that can be used and is simplistic.
     ```python
     from sdi_interface import SDI
 
-    sdi = SDI(username='brodie@ifpi.org', password='pass', crawler_name='demo'
+    sdi = SDI(username='brodie@ifpi.org', password='pass', crawler_name='demo')
     ```
 
 2. Simply insert a result. There are 2 compulsory fileds, and 3 optional fields. 
