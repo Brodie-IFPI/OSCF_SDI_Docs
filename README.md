@@ -43,15 +43,15 @@ Any issues at this stage, please contact me at brodie.gordon-beaven@ifpi.org - s
 
 As of 06/02/2025, there is only one function that can be used and is simplistic.
 
-1. Import sdi and add your GCPN credentials below + the crawler name
+1. Import sdi and add your GCPN credentials below. Please include a crawler name and your org ID (get the numbers off of Brodie manually for now) 
 
     ```python
     from sdi_interface import SDI
 
-    sdi = SDI(username='brodie@ifpi.org', password='pass', crawler_name='demo')
+    sdi = SDI(username='brodie@ifpi.org', password='pass', crawler_name='demo', org_id=1)
     ```
 
-2. Simply insert a result. There are 2 compulsory fileds, and 3 optional fields. 
+3. Simply insert a result. There are 2 compulsory fileds, and 3 optional fields. 
 
     URL and Filename are compulsory fields.
    
