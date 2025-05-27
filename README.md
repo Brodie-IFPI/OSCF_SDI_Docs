@@ -26,14 +26,7 @@ Any issues at this stage, please contact me at brodie.gordon-beaven@ifpi.org - s
 
 ### Installation
 
-1. Clone the repository:
-
-    ```sh
-    git clone https://github.com/yourusername/sdi-project.git
-    cd sdi_interface-project
-    ```
-
-2. Install the required packages:
+1. Install the required packages:
 
     ```
     pip install git+https://Brodie-IFPI:TOKEN_PROVIDED_BY_BRODIE@github.com/Brodie-IFPI/OSCF_SDI.git#egg=sdi_interface
