@@ -1,23 +1,26 @@
 # OSCF SDI Interface
-Version 1.0.0
-
-## Forenotices
-
-Expect bugs! This is a rushed out quick implementation. If you find issues with this interface, I will provide the URLs for interacting with the SDI API below in due course. 
-
-OSCF is the Open Scraper Crawler Framework - a project to enhance the infrastructure IFPI provides for web scraping. Please contact brodie.gordon-beaven@ifpi.org or Oscar.Ferreira@ifpi.org for further details. 
-
-SDI is a component of OSCF (Simple Database Interactions). Apologies for all the acronyms - we will make it all a bit simpler eventually! 
-
-You will need a GCPN account to use this. If you do not have a GCPN account, please make contact with IFPI's london development team. 
+Version 1.1.0
 
 ## Overview
 
-This interface is designed to interact with OSCF's SDI API, allowing for the insertion of crawler results into GCPN and handling authentication to the API. The project is built using Python and leverages the `requests` library for HTTP requests and `loguru` for logging.
+OSCF (Open Scraper Crawler Framework) SDI (Simple Database Interactions) provides a Python interface to submit crawler results to IFPI's GCPN-backed API and retrieve operational insights. It now includes:
 
-Any issues at this stage, please contact me at brodie.gordon-beaven@ifpi.org - suggestions, bugs, critisicm, cries for help - its all welcome!
+- Batch sending with retry/backoff
+- Optional local database buffering and recovery
+- API-driven crawler result filtering (filenames/URLs)
+- Crawler result status lookups (by URLs or crawler names)
+- Automatic authentication token refresh
 
-## Quick Start Guide
+Built with Python and requests, with loguru for structured logging.
+
+For access, you need a GCPN account. Contact IFPI’s London development team.
+
+Note for release on 15/08 - this is a major update im releasing with very limited user testing.
+If there are any huge issues with the local db or filtering, these can be disabled and hopefully everything lives.
+Besides from this, anything critical breaking I will either be hotfixing, blocking off the feature or worst case, reverting.
+Best of luck!
+
+## Quick Start
 
 ### Prerequisites
 
@@ -26,77 +29,125 @@ Any issues at this stage, please contact me at brodie.gordon-beaven@ifpi.org - s
 
 ### Installation
 
-1. Install the required packages:
+- From source or your package index. For Git install (repo is private, please refer to distributed email).
 
-    ```
-    pip install git+https://Brodie-IFPI:TOKEN_PROVIDED_BY_BRODIE@github.com/Brodie-IFPI/OSCF_SDI.git#egg=sdi_interface
-    ```
+  ```sh
+  pip install git+https://github.com/Brodie-IFPI:[KEY]@github.com/OSCF_SDI.git#egg=sdi_interface
+  ```
 
-### Usage
+  If the repo is private, use a personal access token as appropriate.
 
-As of 06/02/2025, there is only one function that can be used and is simplistic.
+### Basic usage
 
-1. Import sdi and add your GCPN credentials below. Please include a crawler name and your org ID (get the numbers off of Brodie manually for now) 
+```python
+from sdi_interface import SDI
 
-    ```python
-    from sdi_interface import SDI
+# Enable local DB buffering and API-side filtering by default
+sdi = SDI(
+    username='you@ifpi.org',
+    password='your-password',
+    crawler_name='MyCrawler',
+    use_local_db=True,
+    filtering_enabled=True,
+)
 
-    sdi = SDI(username='brodie@ifpi.org', password='pass', crawler_name='demo', org_id=1)
-    ```
+# Insert a single crawler result (runs on background threads)
+sdi.insert_crawler_result(
+    url="https://example.com/path/file.mp3",
+    filename="file.mp3",
+    referrer="https://google.com",
+    description="Auto-detected sample",
+    uploader="DetectorBot",
+)
 
-3. Simply insert a result. There are 2 compulsory fileds, and 3 optional fields. 
 
-    URL and Filename are compulsory fields.
-   
-    ```python
-    sdi.insert_crawler_result(url="www.infringement.com", filename="infringement")
-    ```
-    You can also include a referrer link, a description and an identifier for the infringement uploader
+```
 
-   ```python
-    sdi.insert_crawler_result(url="www.infringement.com",
-                               filename="infringement",
-                               referrer="www.google.com"
-                               description="Something I found"
-                               uploader="Oscar")
-    ```
+### Status lookups
 
-   All API interactions are performed on a separate thread. There is no need to await for the thread to finish.
-   
-## Detailed Code Commentary
+```python
+# By URLs
+result_by_urls = sdi.get_crawler_results_status_for_urls([
+    "https://example.com/path/file.mp3",
+    "https://another.com/a"
+])
 
-### `sdi.py`
+# By crawler names
+result_by_crawlers = sdi.get_crawler_results_status_for_crawlers([
+    "MyCrawler",
+    "PartnerCrawler"
+])
 
-This file contains the main `SDI` class, which handles authentication and the insertion of crawler results.
+# Or, if local db is active
+results = sdi.get_crawler_results_status()
 
-- **`__new__` and `__init__` Methods**: Ensures that `SDI` is a singleton class, meaning only one instance can exist at a time.
-- **`setup` Method**: Authenticates the user and sets up the necessary headers for API requests.
-- **`insert_crawler_result` Method**: Inserts a crawler result into the SDI database. This method validates the body content, sends the request, and processes the response.
+```
 
-### `services/api_contact.py`
+## Key capabilities
 
-This file contains classes and methods for interacting with the SDI API.
+- **Batch sending and retry**
+  - Results are queued and sent in batches (`Defaults.BATCH_SIZE`)
+  - Automatic backoff and retry up to `Defaults.TRANSACTION_RETRY_LIMIT`
+  - Partial batch failures are re-queued; successes are acknowledged
 
-- **`Transaction` Class**: Handles the creation, data validation and sending of API requests.
-- **`Digester` Class**: Processes the API responses and handles different status codes.
-- **`Authenticator` Class**: Manages user authentication and token generation.
+- **Local database buffering (optional)**
+  - Durable queue for intermittent connectivity
+  - Automatic startup via `DatabaseClientWrapper`
+  - Periodic polling of ready-to-send items with unlock delay (`Defaults.UNLOCK_DELAY`)
+  - Configurable path via `DEFAULT_LOCAL_DATABASE_PATH` env var
+  - SQLite database is sitting in local_db service - dont be afriad, take a look! 
 
-### `utils/general.py`
+- **Crawler result filtering**
+  - Pulls filename and URL filters from API at startup
+  - Filters preempt submissions; when using local DB, filtered records are retained locally with a filtered flag
 
-This file contains utility functions and decorators.
+- **Status insights**
+  - Query aggregate status for URLs or crawler names
+  - Responses include mapped status descriptions when available
 
-- **`force_thread` Decorator**: Runs a function in a separate thread.
-- **`Utils` Class**: Provides utility methods, such as generating a default crawler name if one is accidentally not supplied.
+- **Authentication resilience**
+  - Authenticator handles initial login and header provisioning
+  - Token refresh on demand via `refresh_token()`
 
-## Upcoming and on my todos
+## Configuration
 
-There is alot to be done here - this is a simple implementation to get the ball rolling. The more urgent requirements include:
-- Improved logging for informing on whether the crawler result insert was successful.
-- General testing across the API / Facade - both user and automated
-- Batch sending to the API rather than one by one
-- Further endpoints for more visibility on whats going on inside GCPN and access to set lists of things e.g rep priorities or common filename filters
-- Pypi support for installation (and threby greater securtiy)
-- Clean up all the TODO's I left lying around, i.e fix the easy problems and ticket the hard ones
-- Implement a middleware database between the API and your crawlers to hold crawler results.
-- Automated endpoint updating i.e if we change a field on the API, you will not need to update this library as the endpoints on here will change too.
-- Better response digesting - i.e take certain precautions if the API is throwing 500s.
+See `sdi_interface/constants.py` for defaults. I would only recommend changing these if you know what you're doing:
+
+- `Defaults.BATCH_SIZE` (default 100)
+- `Defaults.TRANSACTION_RETRY_LIMIT` (default 3)
+- `Defaults.UNLOCK_DELAY` (seconds between record retries)
+- `Defaults.DEFAULT_LOCAL_DATABASE_PATH` (SQLite path; override via env var `DEFAULT_LOCAL_DATABASE_PATH`)
+
+## Module guide (high level)
+
+- `sdi_interface/sdi.py`
+  - SDI facade with background processing and convenience methods
+
+- `sdi_interface/services`
+  - `crawler_results_processor.py`: batch queue, retries, DB polling
+  - `crawler_result_filtering.py`: API filters for filenames/URLs
+  - `crawler_results_status.py`: status lookups and formatting helpers
+  - `api/`
+    - `authenticator.py`: token acquisition and refresh
+    - `endpoints/`: typed endpoints for auth, crawler results, filters, status
+  - `local_db/`
+    - `db_client`, `db_controller`, `db_client_wrapper`: embedded service lifecycle
+    - `orm.py`: SQLite models (`IngestedResult`, `SystemVariable`)
+
+- `sdi_interface/utils`
+  - `general.py`: Utils and `force_thread`
+
+## Notes
+
+- All API interactions run on background threads; no need to await.
+- Logging uses loguru; adjust sink/level as needed in your application.
+
+## Roadmap
+
+- Enhanced success/error surfacing and metrics
+- Additional endpoints for operational visibility and configuration
+- Automated endpoint schema updates
+- Extended response digestion and resilience to transient API failures
+- OSCF DBUE (IFPI's internal database connection tool) integration
+- GUI interface for uploading via SDI and viewing results
+- Greater control over logs (I know they spam like crazy)
